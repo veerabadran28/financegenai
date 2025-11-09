@@ -366,6 +366,50 @@ pip install docling==2.9.0
 pip install pymupdf==1.24.0
 ```
 
+### **Issue 3a: python-magic / libmagic Error (Windows)**
+
+**Error:** `ImportError: failed to find libmagic. Check your installation`
+
+**This is now FIXED in the latest code!** Just pull the latest changes:
+
+```bash
+cd C:\Users\veera\PythonProjects\project24\financegenai
+git pull origin claude/access-check-011CUwmLgpwnY1EKQJBComVb
+
+# Reinstall with updated requirements
+cd mcp-server
+pip install -r requirements.txt
+```
+
+**What was fixed:**
+- ✅ Windows now uses `python-magic-bin` (includes libmagic DLL)
+- ✅ Linux/Mac use standard `python-magic`
+- ✅ Import is now optional (won't crash if missing)
+
+**If still having issues:**
+```bash
+# Uninstall old python-magic
+pip uninstall python-magic
+
+# Install Windows-compatible version
+pip install python-magic-bin==0.4.14
+```
+
+### **Issue 3b: PyPDF2 Deprecation Warning**
+
+**Warning:** `PyPDF2 is deprecated. Please move to the pypdf library instead.`
+
+**This is now FIXED!** The latest code uses `pypdf` instead of `PyPDF2`.
+
+```bash
+# Pull latest changes
+git pull origin claude/access-check-011CUwmLgpwnY1EKQJBComVb
+
+# Reinstall dependencies
+cd mcp-server
+pip install -r requirements.txt
+```
+
 ### **Issue 4: Frontend Can't Connect to Backend**
 
 **Check:**
