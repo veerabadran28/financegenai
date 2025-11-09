@@ -84,8 +84,10 @@ class MCPClient {
   private baseUrl: string;
   private apiKey: string | null = null;
 
-  constructor(baseUrl: string = 'http://localhost:8000') {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    // Use environment variable or fallback to default
+    this.baseUrl = baseUrl || import.meta.env.VITE_MCP_SERVER_URL || 'http://localhost:8000';
+    console.log('MCP Client initialized with base URL:', this.baseUrl);
   }
 
   /**
@@ -121,13 +123,13 @@ class MCPClient {
   }
 
   /**
-   * Process a document file
+   * Process a document file with Docling (enterprise-grade processing)
    */
   async processDocument(file: File): Promise<MCPResponse<ProcessedDocument>> {
     try {
       // Convert file to base64
       const base64Content = await this.fileToBase64(file);
-      
+
       const response = await this.callTool('process_document', {
         file_content: base64Content,
         file_name: file.name,
@@ -139,6 +141,42 @@ class MCPClient {
       return {
         success: false,
         error: `Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Get full document data including all tables and chunks
+   */
+  async getDocumentFullData(documentId: string): Promise<MCPResponse<any>> {
+    try {
+      const response = await this.callTool('get_document_full_data', {
+        document_id: documentId
+      });
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get document data: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Get extracted tables from a document
+   */
+  async getDocumentTables(documentId: string): Promise<MCPResponse<any>> {
+    try {
+      const response = await this.callTool('get_document_tables', {
+        document_id: documentId
+      });
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get document tables: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }

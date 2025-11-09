@@ -32,6 +32,70 @@ export interface FileAttachment {
   url: string;
 }
 
+// Table extraction types
+export interface ExtractedTable {
+  id: string;
+  title?: string;
+  headers: string[];
+  rows: string[][];
+  pageNumber?: number;
+  markdown: string;  // Markdown formatted table
+}
+
+// Enhanced document chunk with table support
+export interface DocumentChunk {
+  id: string;
+  content: string;
+  startIndex: number;
+  endIndex: number;
+  type: 'paragraph' | 'heading' | 'table' | 'list';
+  metadata?: {
+    pageNumber?: number;
+    hasTable?: boolean;
+    tableId?: string;
+    hasVisualElements?: boolean;
+    [key: string]: any;
+  };
+}
+
+// Document layout information
+export interface DocumentLayout {
+  hasMultipleColumns: boolean;
+  pageCount: number;
+  sections: Array<{
+    type: string;
+    pageRange: [number, number];
+  }>;
+}
+
+// Document metadata
+export interface DocumentMetadata {
+  pageCount?: number;
+  wordCount: number;
+  characterCount: number;
+  language?: string;
+  createdDate?: Date;
+  modifiedDate?: Date;
+  author?: string;
+  title?: string;
+  subject?: string;
+  keywords?: string[];
+}
+
+// Enhanced processed document
+export interface ProcessedDocument {
+  id: string;
+  fileName: string;
+  content: string;
+  type: string;
+  metadata: DocumentMetadata;
+  chunks: DocumentChunk[];
+  tables?: ExtractedTable[];  // NEW: Extracted tables
+  layout?: DocumentLayout;     // NEW: Document layout
+  processor?: string;          // NEW: Which processor was used (docling/pymupdf_fallback)
+  processedAt?: string;        // NEW: Processing timestamp
+}
+
 export interface DiagramData {
   id: string;
   type: 'flowchart' | 'diagram' | 'process' | 'organizational' | 'timeline' | 'bar' | 'pie' | 'line' | 'table' | 'mermaid';

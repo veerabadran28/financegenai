@@ -1,349 +1,157 @@
-import { FileAttachment } from '../types';
-import * as pdfjsLib from 'pdfjs-dist';
+/**
+ * Document Processor - Backend Integration
+ * All document processing now happens on the backend with Docling
+ * No more client-side PDF.js processing
+ */
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+import { FileAttachment, ProcessedDocument } from '../types';
+import { mcpClient } from '../services/mcpClient';
 
-export interface ProcessedDocument {
-  fileName: string;
-  content: string;
-  type: string;
-  metadata: DocumentMetadata;
-  chunks: DocumentChunk[];
-}
-
-export interface DocumentMetadata {
-  pageCount?: number;
-  wordCount: number;
-  characterCount: number;
-  language?: string;
-  createdDate?: Date;
-  modifiedDate?: Date;
-  author?: string;
-  title?: string;
-  subject?: string;
-  keywords?: string[];
-}
-
-export interface DocumentChunk {
-  id: string;
-  content: string;
-  startIndex: number;
-  endIndex: number;
-  type: 'paragraph' | 'heading' | 'table' | 'list';
-  metadata?: any;
-}
-
-export const processDocuments = async (files: FileAttachment[]): Promise<ProcessedDocument[]> => {
+/**
+ * Process documents using backend Docling service
+ * Supports: PDF, DOCX, PPTX, XLSX, Images (with OCR), HTML, TXT
+ */
+export const processDocuments = async (
+  files: FileAttachment[]
+): Promise<ProcessedDocument[]> => {
   const processedDocs: ProcessedDocument[] = [];
 
-  for (const file of files) {
+  for (const fileAttachment of files) {
     try {
-      console.log(`Processing document: ${file.name}`);
-      const response = await fetch(file.url);
-      const blob = await response.blob();
-      
-      let processedDoc: ProcessedDocument;
-      
-      if (file.type === 'application/pdf') {
-        processedDoc = await processPDFDocument(file.name, blob);
-      } else if (file.type === 'text/plain') {
-        processedDoc = await processTextDocument(file.name, blob);
-      } else if (file.type.includes('word') || file.type.includes('document')) {
-        processedDoc = await processWordDocument(file.name, blob);
-      } else {
-        processedDoc = await processGenericDocument(file.name, blob, file.type);
-      }
+      console.log(`Processing document via backend: ${fileAttachment.name}`);
 
-      processedDocs.push(processedDoc);
-      console.log(`Successfully processed: ${file.name}`);
+      // Fetch the file blob from the URL
+      const response = await fetch(fileAttachment.url);
+      const blob = await response.blob();
+
+      // Create File object from blob
+      const file = new File([blob], fileAttachment.name, { type: fileAttachment.type });
+
+      // Send to backend for processing
+      const result = await mcpClient.processDocument(file);
+
+      if (result.success && result.data) {
+        // Get full document data including tables
+        const fullDataResult = await mcpClient.getDocumentFullData(result.data.documentId);
+
+        if (fullDataResult.success && fullDataResult.data) {
+          const fullData = fullDataResult.data;
+
+          // Convert to ProcessedDocument format
+          const processedDoc: ProcessedDocument = {
+            id: fullData.id || result.data.documentId,
+            fileName: fullData.fileName || fileAttachment.name,
+            content: fullData.content || '',
+            type: fullData.type || fileAttachment.type,
+            metadata: {
+              pageCount: fullData.metadata?.pageCount,
+              wordCount: fullData.metadata?.wordCount || 0,
+              characterCount: fullData.metadata?.characterCount || 0,
+              language: fullData.metadata?.language,
+              title: fullData.metadata?.title,
+              author: fullData.metadata?.author
+            },
+            chunks: fullData.chunks || [],
+            tables: fullData.tables || [],
+            layout: fullData.layout,
+            processor: fullData.processor,
+            processedAt: fullData.processedAt
+          };
+
+          processedDocs.push(processedDoc);
+
+          console.log(`✅ Successfully processed: ${fileAttachment.name}`);
+          console.log(`   Processor: ${processedDoc.processor}`);
+          console.log(`   Tables extracted: ${processedDoc.tables?.length || 0}`);
+          console.log(`   Chunks created: ${processedDoc.chunks.length}`);
+        } else {
+          // Fallback if full data retrieval fails
+          const errorDoc = createErrorDocument(
+            fileAttachment.name,
+            fileAttachment.type,
+            'Failed to retrieve full document data'
+          );
+          processedDocs.push(errorDoc);
+        }
+      } else {
+        // Processing failed
+        const errorDoc = createErrorDocument(
+          fileAttachment.name,
+          fileAttachment.type,
+          result.error || 'Unknown processing error'
+        );
+        processedDocs.push(errorDoc);
+      }
     } catch (error) {
-      console.error(`Error processing file ${file.name}:`, error);
-      processedDocs.push(createErrorDocument(file.name, file.type, error));
+      console.error(`Error processing file ${fileAttachment.name}:`, error);
+
+      const errorDoc = createErrorDocument(
+        fileAttachment.name,
+        fileAttachment.type,
+        error instanceof Error ? error.message : 'Unknown error occurred'
+      );
+      processedDocs.push(errorDoc);
     }
   }
 
   return processedDocs;
 };
 
-const processPDFDocument = async (fileName: string, blob: Blob): Promise<ProcessedDocument> => {
-  try {
-    const arrayBuffer = await blob.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    
-    let fullText = '';
-    const chunks: DocumentChunk[] = [];
-    let chunkIndex = 0;
+/**
+ * Create error document when processing fails
+ */
+function createErrorDocument(
+  fileName: string,
+  type: string,
+  errorMessage: string
+): ProcessedDocument {
+  const errorContent = `❌ Document Processing Error
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      let pageText = '';
-      textContent.items.forEach((item: any) => {
-        if (item.str) {
-          pageText += item.str + ' ';
-        }
-      });
+File: ${fileName}
+Error: ${errorMessage}
 
-      if (pageText.trim()) {
-        const startIndex = fullText.length;
-        fullText += `\n--- Page ${pageNum} ---\n${pageText}\n`;
-        const endIndex = fullText.length;
+This document could not be processed. Please try:
+1. Re-uploading the document
+2. Ensuring the file is not corrupted or password-protected
+3. Converting to a different format if possible
 
-        chunks.push({
-          id: `chunk-${chunkIndex++}`,
-          content: pageText.trim(),
-          startIndex,
-          endIndex,
-          type: 'paragraph',
-          metadata: { pageNumber: pageNum }
-        });
-      }
-    }
+If the issue persists, contact support.`;
 
-    const metadata = await extractPDFMetadata(pdf);
-    
-    return {
-      fileName,
-      content: fullText.trim(),
-      type: 'application/pdf',
-      metadata: {
-        ...metadata,
-        pageCount: pdf.numPages,
-        wordCount: countWords(fullText),
-        characterCount: fullText.length
-      },
-      chunks
-    };
-  } catch (error) {
-    console.error('PDF processing error:', error);
-    return createFallbackPDFDocument(fileName);
-  }
-};
-
-const processTextDocument = async (fileName: string, blob: Blob): Promise<ProcessedDocument> => {
-  const content = await blob.text();
-  const chunks = createTextChunks(content);
-  
   return {
-    fileName,
-    content,
-    type: 'text/plain',
-    metadata: {
-      wordCount: countWords(content),
-      characterCount: content.length,
-      language: detectLanguage(content)
-    },
-    chunks
-  };
-};
-
-const processWordDocument = async (fileName: string, blob: Blob): Promise<ProcessedDocument> => {
-  // Try to read as text first
-  try {
-    const content = await blob.text();
-    if (content && content.trim().length > 0 && !content.includes('\0')) {
-      const chunks = createTextChunks(content);
-      return {
-        fileName,
-        content,
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        metadata: {
-          wordCount: countWords(content),
-          characterCount: content.length,
-          language: detectLanguage(content)
-        },
-        chunks
-      };
-    }
-  } catch (error) {
-    console.warn('Could not read Word document as text:', error);
-  }
-  
-  // Fallback error message
-  const errorContent = `Unable to process Word document "${fileName}". Please try converting to PDF or TXT format for better compatibility.`;
-  const chunks = createTextChunks(errorContent);
-  
-  return {
+    id: `error-${Date.now()}-${Math.random()}`,
     fileName,
     content: errorContent,
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    metadata: {
-      wordCount: countWords(errorContent),
-      characterCount: errorContent.length
-    },
-    chunks
-  };
-};
-
-const processGenericDocument = async (fileName: string, blob: Blob, type: string): Promise<ProcessedDocument> => {
-  try {
-    const content = await blob.text();
-    
-    if (!content || content.trim().length === 0) {
-      throw new Error('Document appears to be empty or unreadable');
-    }
-    
-    const chunks = createTextChunks(content);
-    
-    return {
-      fileName,
-      content,
-      type,
-      metadata: {
-        wordCount: countWords(content),
-        characterCount: content.length
-      },
-      chunks
-    };
-  } catch (error) {
-    console.error(`Error processing ${fileName}:`, error);
-    return createErrorDocument(fileName, type, error);
-  }
-};
-
-const extractPDFMetadata = async (pdf: any): Promise<Partial<DocumentMetadata>> => {
-  try {
-    const metadata = await pdf.getMetadata();
-    return {
-      title: metadata.info?.Title || undefined,
-      author: metadata.info?.Author || undefined,
-      subject: metadata.info?.Subject || undefined,
-      keywords: metadata.info?.Keywords ? metadata.info.Keywords.split(',').map((k: string) => k.trim()) : undefined,
-      createdDate: metadata.info?.CreationDate ? new Date(metadata.info.CreationDate) : undefined,
-      modifiedDate: metadata.info?.ModDate ? new Date(metadata.info.ModDate) : undefined
-    };
-  } catch (error) {
-    console.warn('Could not extract PDF metadata:', error);
-    return {};
-  }
-};
-
-const createTextChunks = (content: string): DocumentChunk[] => {
-  const chunks: DocumentChunk[] = [];
-  const paragraphs = content.split(/\n\s*\n/);
-  let currentIndex = 0;
-  let chunkId = 0;
-
-  paragraphs.forEach(paragraph => {
-    if (paragraph.trim()) {
-      const startIndex = currentIndex;
-      const endIndex = currentIndex + paragraph.length;
-      
-      chunks.push({
-        id: `chunk-${chunkId++}`,
-        content: paragraph.trim(),
-        startIndex,
-        endIndex,
-        type: detectChunkType(paragraph),
-        metadata: {}
-      });
-    }
-    currentIndex += paragraph.length + 2; // +2 for the double newline
-  });
-
-  return chunks;
-};
-
-const detectChunkType = (text: string): DocumentChunk['type'] => {
-  const trimmed = text.trim();
-  
-  if (/^#{1,6}\s/.test(trimmed) || /^[A-Z][^.!?]*:?\s*$/.test(trimmed)) {
-    return 'heading';
-  }
-  if (/^\s*[-*+]\s/.test(trimmed) || /^\s*\d+\.\s/.test(trimmed)) {
-    return 'list';
-  }
-  if (/\|.*\|/.test(trimmed) || /^\s*\+[-=+]+\+/.test(trimmed)) {
-    return 'table';
-  }
-  
-  return 'paragraph';
-};
-
-const countWords = (text: string): number => {
-  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-};
-
-const detectLanguage = (text: string): string => {
-  // Simple language detection - in production use a proper library
-  const sample = text.toLowerCase().substring(0, 1000);
-  
-  if (/\b(the|and|or|but|in|on|at|to|for|of|with|by)\b/.test(sample)) {
-    return 'en';
-  }
-  if (/\b(le|la|les|et|ou|mais|dans|sur|à|pour|de|avec|par)\b/.test(sample)) {
-    return 'fr';
-  }
-  if (/\b(der|die|das|und|oder|aber|in|auf|zu|für|von|mit|durch)\b/.test(sample)) {
-    return 'de';
-  }
-  
-  return 'unknown';
-};
-
-const createErrorDocument = (fileName: string, type: string, error: any): ProcessedDocument => {
-  const errorMessage = `Error processing document "${fileName}": ${error.message || 'Unknown error occurred'}`;
-  
-  return {
-    fileName,
-    content: errorMessage,
     type,
     metadata: {
       wordCount: 0,
-      characterCount: errorMessage.length
+      characterCount: errorContent.length
     },
-    chunks: [{
-      id: 'error-chunk',
-      content: errorMessage,
-      startIndex: 0,
-      endIndex: errorMessage.length,
-      type: 'paragraph'
-    }]
+    chunks: [
+      {
+        id: 'error-chunk',
+        content: errorContent,
+        startIndex: 0,
+        endIndex: errorContent.length,
+        type: 'paragraph'
+      }
+    ],
+    processor: 'error'
   };
-};
+}
 
-const createFallbackPDFDocument = (fileName: string): ProcessedDocument => {
-  const content = `ERROR: Unable to process PDF document "${fileName}"
-
-The document could not be read properly. This may be due to:
-- Encrypted or password-protected PDF
-- Corrupted file format
-- Unsupported PDF version
-- Network issues during upload
-
-Please try:
-1. Re-uploading the document
-2. Ensuring the PDF is not password-protected
-3. Converting to a different format if possible
-
-If the issue persists, the document may contain complex formatting that requires manual review.`;
-
-  const chunks = createTextChunks(content);
-  
-  return {
-    fileName,
-    content,
-    type: 'application/pdf',
-    metadata: {
-      pageCount: 0,
-      wordCount: countWords(content),
-      characterCount: content.length,
-      title: 'Processing Error',
-      author: 'System',
-      language: 'en'
-    },
-    chunks
-  };
-};
-
-
-export const searchDocumentContent = (documents: ProcessedDocument[], query: string): DocumentChunk[] => {
-  const results: DocumentChunk[] = [];
+/**
+ * Search document content for specific query
+ * Uses the enhanced chunks with table support
+ */
+export const searchDocumentContent = (
+  documents: ProcessedDocument[],
+  query: string
+): any[] => {
+  const results: any[] = [];
   const queryLower = query.toLowerCase();
-  
+
   documents.forEach(doc => {
+    // Search in chunks
     doc.chunks.forEach(chunk => {
       if (chunk.content.toLowerCase().includes(queryLower)) {
         results.push({
@@ -356,21 +164,52 @@ export const searchDocumentContent = (documents: ProcessedDocument[], query: str
         });
       }
     });
+
+    // Also search in extracted tables
+    if (doc.tables && doc.tables.length > 0) {
+      doc.tables.forEach(table => {
+        // Search in table markdown
+        if (table.markdown.toLowerCase().includes(queryLower)) {
+          results.push({
+            id: `table-${table.id}`,
+            content: table.markdown,
+            startIndex: 0,
+            endIndex: table.markdown.length,
+            type: 'table',
+            metadata: {
+              fileName: doc.fileName,
+              hasTable: true,
+              tableId: table.id,
+              tableTitle: table.title,
+              pageNumber: table.pageNumber,
+              relevanceScore: calculateRelevanceScore(table.markdown, query)
+            }
+          });
+        }
+      });
+    }
   });
-  
-  return results.sort((a, b) => (b.metadata?.relevanceScore || 0) - (a.metadata?.relevanceScore || 0));
+
+  // Sort by relevance score
+  return results.sort((a, b) =>
+    (b.metadata?.relevanceScore || 0) - (a.metadata?.relevanceScore || 0)
+  );
 };
 
-const calculateRelevanceScore = (content: string, query: string): number => {
+/**
+ * Calculate relevance score for content matching
+ */
+function calculateRelevanceScore(content: string, query: string): number {
   const contentLower = content.toLowerCase();
   const queryLower = query.toLowerCase();
   const queryWords = queryLower.split(/\s+/);
-  
+
   let score = 0;
   queryWords.forEach(word => {
     const matches = (contentLower.match(new RegExp(word, 'g')) || []).length;
     score += matches;
   });
-  
-  return score / content.length * 1000; // Normalize by content length
-};
+
+  // Normalize by content length
+  return score / content.length * 1000;
+}

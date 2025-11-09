@@ -28,6 +28,9 @@ import numpy as np
 import markdown
 from jinja2 import Template
 
+# Import Docling processor
+from docling_processor import get_processor
+
 # Initialize FastMCP app
 app = FastMCP("Document Analysis Server")
 
@@ -113,243 +116,131 @@ async def process_document(
     file_type: str
 ) -> Dict[str, Any]:
     """
-    Process uploaded documents and extract text content.
-    
+    Process uploaded documents using enterprise-grade Docling processor.
+    Supports: PDF, DOCX, PPTX, XLSX, Images (with OCR), HTML, TXT
+
     Args:
         file_content: Base64 encoded file content
         file_name: Name of the file
         file_type: MIME type of the file
-    
+
     Returns:
-        Dictionary containing processed document data
+        Dictionary containing processed document data with tables and structure
     """
     try:
         # Decode base64 content
         file_data = base64.b64decode(file_content)
-        
+
         # Create temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file_name).suffix) as temp_file:
             temp_file.write(file_data)
             temp_path = temp_file.name
-        
+
         try:
-            # Process based on file type
-            if file_type == 'application/pdf':
-                processed_doc = await _process_pdf(temp_path, file_name)
-            elif file_type == 'text/plain':
-                processed_doc = await _process_text(temp_path, file_name)
-            elif 'word' in file_type or 'document' in file_type:
-                processed_doc = await _process_word(temp_path, file_name)
-            else:
-                processed_doc = await _process_generic(temp_path, file_name, file_type)
-            
-            # Store in document store
-            document_store[processed_doc.id] = processed_doc.dict()
-            
+            # Get processor instance
+            processor = get_processor()
+
+            # Process document with Docling (+ PyMuPDF fallback)
+            result = await processor.process_document(temp_path, file_type)
+
+            # Generate unique document ID
+            doc_id = str(uuid.uuid4())
+            result["id"] = doc_id
+
+            # Store in document store for later retrieval
+            document_store[doc_id] = result
+
+            # Return summary response
             return {
-                "success": True,
-                "document_id": processed_doc.id,
-                "file_name": processed_doc.file_name,
-                "content_preview": processed_doc.content[:500] + "..." if len(processed_doc.content) > 500 else processed_doc.content,
-                "metadata": processed_doc.metadata.dict(),
-                "chunk_count": len(processed_doc.chunks)
+                "success": result.get("success", True),
+                "documentId": doc_id,
+                "fileName": result["fileName"],
+                "processor": result.get("processor", "unknown"),
+                "contentPreview": result["content"][:500] + "..." if len(result["content"]) > 500 else result["content"],
+                "metadata": result["metadata"],
+                "tableCount": len(result.get("tables", [])),
+                "chunkCount": len(result.get("chunks", [])),
+                "hasStructuredData": len(result.get("tables", [])) > 0,
+                "processedAt": result.get("processedAt")
             }
-            
+
         finally:
             # Clean up temp file
-            os.unlink(temp_path)
-            
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+
     except Exception as e:
         return {
             "success": False,
             "error": f"Failed to process document: {str(e)}",
-            "file_name": file_name
+            "fileName": file_name,
+            "processor": "error"
         }
 
-async def _process_pdf(file_path: str, file_name: str) -> ProcessedDocument:
-    """Process PDF document"""
-    with open(file_path, 'rb') as file:
-        pdf_reader = PyPDF2.PdfReader(file)
-        
-        full_text = ""
-        chunks = []
-        chunk_index = 0
-        
-        for page_num, page in enumerate(pdf_reader.pages, 1):
-            try:
-                page_text = page.extract_text()
-                if page_text.strip():
-                    start_index = len(full_text)
-                    full_text += f"\n--- Page {page_num} ---\n{page_text}\n"
-                    end_index = len(full_text)
-                    
-                    chunks.append(DocumentChunk(
-                        id=f"chunk-{chunk_index}",
-                        content=page_text.strip(),
-                        start_index=start_index,
-                        end_index=end_index,
-                        chunk_type="paragraph",
-                        metadata={"page_number": page_num}
-                    ))
-                    chunk_index += 1
-            except Exception as e:
-                print(f"Error processing page {page_num}: {e}")
-                continue
-        
-        metadata = DocumentMetadata(
-            page_count=len(pdf_reader.pages),
-            word_count=len(full_text.split()),
-            character_count=len(full_text),
-            language="en"
-        )
-        
-        return ProcessedDocument(
-            id=str(uuid.uuid4()),
-            file_name=file_name,
-            content=full_text.strip(),
-            file_type="application/pdf",
-            metadata=metadata,
-            chunks=chunks,
-            created_at=datetime.now()
-        )
 
-async def _process_text(file_path: str, file_name: str) -> ProcessedDocument:
-    """Process text document"""
-    async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
-        content = await file.read()
-    
-    chunks = _create_text_chunks(content)
-    
-    metadata = DocumentMetadata(
-        word_count=len(content.split()),
-        character_count=len(content),
-        language="en"
-    )
-    
-    return ProcessedDocument(
-        id=str(uuid.uuid4()),
-        file_name=file_name,
-        content=content,
-        file_type="text/plain",
-        metadata=metadata,
-        chunks=chunks,
-        created_at=datetime.now()
-    )
+@app.tool()
+async def get_document_full_data(document_id: str) -> Dict[str, Any]:
+    """
+    Get full document data including all tables and chunks
 
-async def _process_word(file_path: str, file_name: str) -> ProcessedDocument:
-    """Process Word document"""
+    Args:
+        document_id: Unique document identifier
+
+    Returns:
+        Complete document data
+    """
     try:
-        doc = docx.Document(file_path)
-        content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-        
-        if not content.strip():
-            raise Exception("No readable content found in Word document")
-        
-        chunks = _create_text_chunks(content)
-        
-        metadata = DocumentMetadata(
-            word_count=len(content.split()),
-            character_count=len(content),
-            language="en"
-        )
-        
-        return ProcessedDocument(
-            id=str(uuid.uuid4()),
-            file_name=file_name,
-            content=content,
-            file_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            metadata=metadata,
-            chunks=chunks,
-            created_at=datetime.now()
-        )
-    except Exception as e:
-        # Fallback error document
-        error_content = f"Unable to process Word document '{file_name}'. Error: {str(e)}"
-        chunks = _create_text_chunks(error_content)
-        
-        metadata = DocumentMetadata(
-            word_count=len(error_content.split()),
-            character_count=len(error_content)
-        )
-        
-        return ProcessedDocument(
-            id=str(uuid.uuid4()),
-            file_name=file_name,
-            content=error_content,
-            file_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            metadata=metadata,
-            chunks=chunks,
-            created_at=datetime.now()
-        )
+        if document_id not in document_store:
+            return {
+                "success": False,
+                "error": f"Document {document_id} not found"
+            }
 
-async def _process_generic(file_path: str, file_name: str, file_type: str) -> ProcessedDocument:
-    """Process generic document"""
+        return {
+            "success": True,
+            **document_store[document_id]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.tool()
+async def get_document_tables(document_id: str) -> Dict[str, Any]:
+    """
+    Get extracted tables from a processed document
+
+    Args:
+        document_id: Unique document identifier
+
+    Returns:
+        List of extracted tables with structure
+    """
     try:
-        async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
-            content = await file.read()
-        
-        if not content.strip():
-            raise Exception("Document appears to be empty")
-        
-        chunks = _create_text_chunks(content)
-        
-        metadata = DocumentMetadata(
-            word_count=len(content.split()),
-            character_count=len(content)
-        )
-        
-        return ProcessedDocument(
-            id=str(uuid.uuid4()),
-            file_name=file_name,
-            content=content,
-            file_type=file_type,
-            metadata=metadata,
-            chunks=chunks,
-            created_at=datetime.now()
-        )
-    except Exception as e:
-        error_content = f"Error processing document '{file_name}': {str(e)}"
-        chunks = _create_text_chunks(error_content)
-        
-        metadata = DocumentMetadata(
-            word_count=len(error_content.split()),
-            character_count=len(error_content)
-        )
-        
-        return ProcessedDocument(
-            id=str(uuid.uuid4()),
-            file_name=file_name,
-            content=error_content,
-            file_type=file_type,
-            metadata=metadata,
-            chunks=chunks,
-            created_at=datetime.now()
-        )
+        if document_id not in document_store:
+            return {
+                "success": False,
+                "error": f"Document {document_id} not found"
+            }
 
-def _create_text_chunks(content: str) -> List[DocumentChunk]:
-    """Create text chunks from content"""
-    chunks = []
-    paragraphs = content.split('\n\n')
-    current_index = 0
-    chunk_id = 0
-    
-    for paragraph in paragraphs:
-        if paragraph.strip():
-            start_index = current_index
-            end_index = current_index + len(paragraph)
-            
-            chunks.append(DocumentChunk(
-                id=f"chunk-{chunk_id}",
-                content=paragraph.strip(),
-                start_index=start_index,
-                end_index=end_index,
-                chunk_type="paragraph"
-            ))
-            chunk_id += 1
-        
-        current_index += len(paragraph) + 2
-    
-    return chunks
+        doc = document_store[document_id]
+
+        return {
+            "success": True,
+            "documentId": document_id,
+            "fileName": doc["fileName"],
+            "tables": doc.get("tables", []),
+            "tableCount": len(doc.get("tables", []))
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 # =============================================================================
 # DOCUMENT SEARCH TOOLS
