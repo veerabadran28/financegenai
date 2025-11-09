@@ -1458,6 +1458,12 @@ async def get_system_stats() -> Dict[str, Any]:
         }
 
 if __name__ == "__main__":
+    import uvicorn
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    from typing import Any, Dict
+
     print("🚀 Starting FastMCP Document Analysis Server...")
     print("📋 Available tools:")
     print("   • process_document - Process uploaded documents")
@@ -1476,5 +1482,60 @@ if __name__ == "__main__":
     print("   • get_system_stats - System statistics")
     print()
 
-    # Run the FastMCP server using built-in run method
-    app.run(transport="sse", host="0.0.0.0", port=8000)
+    # Create a FastAPI wrapper for REST API compatibility
+    rest_app = FastAPI(title="Document Analysis Server")
+
+    # Enable CORS for frontend access
+    rest_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    class ToolRequest(BaseModel):
+        args: Dict[str, Any] = {}
+
+    @rest_app.get("/health")
+    async def health_check():
+        return {"status": "healthy", "service": "Document Analysis Server"}
+
+    @rest_app.post("/tools/{tool_name}")
+    async def call_tool(tool_name: str, request: Dict[str, Any]):
+        """REST API endpoint for calling MCP tools"""
+        try:
+            # Get the tool function from app
+            tools = {
+                'process_document': process_document,
+                'get_document_full_data': get_document_full_data,
+                'get_document_tables': get_document_tables,
+                'search_documents': search_documents,
+                'setup_openai_client': setup_openai_client,
+                'analyze_document': analyze_document,
+                'generate_diagram': generate_diagram,
+                'export_diagram': export_diagram,
+                'export_chat': export_chat,
+                'get_document_list': get_document_list,
+                'get_conversation_list': get_conversation_list,
+                'delete_document': delete_document,
+                'get_system_stats': get_system_stats,
+            }
+
+            if tool_name not in tools:
+                raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+
+            # Call the tool function with the provided arguments
+            tool_func = tools[tool_name]
+            result = await tool_func(**request)
+
+            return result
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Run the REST API server
+    print("🌐 Starting REST API server on http://0.0.0.0:8000")
+    uvicorn.run(rest_app, host="0.0.0.0", port=8000)
