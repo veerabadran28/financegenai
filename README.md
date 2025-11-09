@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.3-blue)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -48,7 +48,7 @@
 
 ## Overview
 
-**Insights-B** is an enterprise-grade document analysis chatbot that combines the power of GPT-4o-mini with advanced document processing capabilities. It operates in two intelligent modes:
+**Insights-B v2.0** is an enterprise-grade document analysis chatbot that combines the power of GPT-4o-mini with **Docling** (IBM Research) for advanced document processing. With enterprise table extraction, OCR capabilities, and support for 8+ file formats, it delivers accurate insights from complex financial documents and reports. It operates in two intelligent modes:
 
 ### 🌐 Web Mode
 - **Real-time web search** using DuckDuckGo
@@ -57,9 +57,11 @@
 - **Source attribution** with clickable links
 - **Search history** persistence
 
-### 💼 Work Mode
-- **Advanced document analysis** (PDF, Word, Text)
-- **Intelligent Q&A** over uploaded documents
+### 💼 Work Mode (Enhanced with Enterprise AI)
+- **Advanced document analysis** (PDF, DOCX, PPTX, XLSX, Images, HTML, TXT)
+- **Enterprise table extraction** with Docling (IBM Research)
+- **OCR capability** for scanned documents
+- **Intelligent Q&A** over uploaded documents with preserved structure
 - **Smart diagram generation** (flowcharts, charts, tables)
 - **Conversation memory** with Supabase
 - **Multi-document context** understanding
@@ -74,12 +76,20 @@
 - Streaming responses for real-time feedback
 - Intent detection and automatic routing
 
-### 📄 **Advanced Document Processing**
-- **Supported Formats**: PDF, Word (DOCX), Plain Text, CSV, JSON
-- **Client-side processing** using PDF.js
-- **Chunking strategy** for RAG (Retrieval Augmented Generation)
-- **Metadata extraction** (word count, pages, author)
+### 📄 **Enterprise Document Processing** (v2.0 - New!)
+- **Supported Formats**: PDF, DOCX, PPTX, XLSX, Images (PNG/JPG), HTML, TXT, CSV, JSON
+- **Backend Processing** with Python MCP Server (FastMCP)
+- **Docling Integration** (IBM Research) - Primary processor
+  - Advanced table extraction with structure preservation
+  - Layout analysis and section detection
+  - OCR for scanned documents
+  - Multi-column document support
+  - Markdown output optimized for LLMs
+- **PyMuPDF Fallback** - Reliable backup processor
+- **Intelligent Chunking** for RAG (Retrieval Augmented Generation)
+- **Metadata extraction** (word count, pages, author, tables)
 - **Multi-document support** with cross-referencing
+- **Table Preservation**: Financial data, reports, and structured data remain intact
 
 ### 📊 **Dynamic Visualizations**
 - **Flowcharts**: Process flows, decision trees
@@ -117,40 +127,74 @@
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Insights-B Platform                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐           ┌──────────────┐                   │
-│  │  Web Mode    │           │  Work Mode   │                   │
-│  │  🌐 Search   │           │  💼 Docs     │                   │
-│  └──────┬───────┘           └──────┬───────┘                   │
-│         │                          │                            │
-│         v                          v                            │
-│  ┌──────────────────────────────────────────┐                  │
-│  │      AgenticService / IntelligentAgent   │                  │
-│  │   (Intent Detection & Tool Orchestration)│                  │
-│  └──────────────┬───────────────────────────┘                  │
-│                 │                                               │
-│       ┌─────────┴──────────┐                                   │
-│       v                    v                                    │
-│  ┌─────────────┐    ┌──────────────┐                          │
-│  │  OpenAI     │    │  Web Search  │                          │
-│  │  GPT-4o-mini│    │  Service     │                          │
-│  └─────────────┘    └──────────────┘                          │
-│                                                                  │
-│  ┌──────────────────────────────────────────┐                  │
-│  │         Document Processing Pipeline      │                  │
-│  │  PDF.js → Content Extraction → Chunking  │                  │
-│  └──────────────────────────────────────────┘                  │
-│                                                                  │
-│  ┌──────────────────────────────────────────┐                  │
-│  │            Supabase Database             │                  │
-│  │  Conversations | Messages | Documents    │                  │
-│  │  Preferences | Search History            │                  │
-│  └──────────────────────────────────────────┘                  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                     Insights-B Platform (v2.0)                    │
+│              Enterprise-Grade Document Intelligence               │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              React Frontend (Browser)                        ││
+│  │  - Web/Work Mode Toggle                                     ││
+│  │  - File Upload UI                                           ││
+│  │  - Chat Interface                                           ││
+│  └────────────────────┬─────────────────────────────────────────┘│
+│                       │ HTTP/REST API                             │
+│                       v                                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │          Python MCP Server (FastMCP) - Port 8000            ││
+│  │  ┌───────────────────────────────────────────────────────┐ ││
+│  │  │  🚀 Docling Processor (Primary - Enterprise AI)       │ ││
+│  │  │  - Advanced table extraction with structure           │ ││
+│  │  │  - Multi-format support (PDF, DOCX, PPTX, XLSX, etc) │ ││
+│  │  │  - OCR for scanned documents                          │ ││
+│  │  │  - Layout analysis & section detection               │ ││
+│  │  │  - Markdown output optimized for LLMs                 │ ││
+│  │  └───────────────────────────────────────────────────────┘ ││
+│  │  ┌───────────────────────────────────────────────────────┐ ││
+│  │  │  📄 PyMuPDF Fallback (Reliable Backup)               │ ││
+│  │  │  - Robust PDF extraction                              │ ││
+│  │  │  - Basic table detection                              │ ││
+│  │  │  - Fast processing                                     │ ││
+│  │  └───────────────────────────────────────────────────────┘ ││
+│  └────────────────────┬─────────────────────────────────────────┘│
+│                       │ Structured JSON (tables + chunks)        │
+│                       v                                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              AI Processing Layer                             ││
+│  │  ┌──────────────┐           ┌──────────────┐               ││
+│  │  │  Web Mode    │           │  Work Mode   │               ││
+│  │  │  🌐 Search   │           │  💼 Docs     │               ││
+│  │  └──────┬───────┘           └──────┬───────┘               ││
+│  │         │                          │                        ││
+│  │         v                          v                        ││
+│  │  ┌──────────────────────────────────────────┐              ││
+│  │  │   AgenticService / IntelligentAgent     │              ││
+│  │  │  (Intent Detection & Orchestration)     │              ││
+│  │  └──────────────┬───────────────────────────┘              ││
+│  │                 │                                           ││
+│  │       ┌─────────┴──────────┐                               ││
+│  │       v                    v                                ││
+│  │  ┌─────────────┐    ┌──────────────┐                      ││
+│  │  │  OpenAI     │    │  Web Search  │                      ││
+│  │  │  GPT-4o-mini│    │  Service     │                      ││
+│  │  └─────────────┘    └──────────────┘                      ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │            Supabase Database (PostgreSQL)                    ││
+│  │  Conversations | Messages | Documents                       ││
+│  │  Preferences | Search History                               ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+
+Key Enhancements in v2.0:
+✅ Enterprise document processing with Docling
+✅ Advanced table extraction (preserves structure)
+✅ Multi-format support (8+ file types)
+✅ OCR capability for scanned documents
+✅ Backend processing (scalable architecture)
+✅ Dual-processor system (Docling + PyMuPDF fallback)
 ```
 
 ### Technology Stack
@@ -167,9 +211,18 @@
 - **Function Calling** - Agentic tool use
 - **RAG Pattern** - Document context retrieval
 
-#### **Document Processing**
-- **pdf.js (pdfjs-dist) 3.11.174** - PDF parsing
-- **Custom parsers** - Word, text, CSV support
+#### **Document Processing** (Enterprise Backend)
+- **Docling 2.9.0** - IBM Research enterprise document processor
+  - Advanced table extraction with structure preservation
+  - Multi-format support (PDF, DOCX, PPTX, XLSX, Images, HTML, TXT)
+  - OCR capability for scanned documents
+  - Layout analysis and section detection
+  - Markdown output optimized for LLMs
+- **PyMuPDF 1.24.0** - Robust fallback processor
+  - Fast PDF extraction
+  - Basic table detection
+  - Reliable backup processing
+- **Python Magic 0.4.27** - File type detection
 
 #### **Data Visualization**
 - **Chart.js 4.5.1** - Canvas-based charts
@@ -177,7 +230,13 @@
 - **Recharts 3.3.0** - Declarative charts
 - **Custom SVG** - Flowcharts and diagrams
 
-#### **Backend & Storage**
+#### **Backend Services**
+- **FastMCP 0.2.0** - MCP (Model Context Protocol) server framework
+- **Python 3.9+** - Backend runtime
+- **Uvicorn 0.24.0** - ASGI server
+- **Pydantic 2.5.0** - Data validation
+
+#### **Database & Storage**
 - **Supabase 2.80.0** - PostgreSQL database
 - **Row-Level Security** - Data access control
 - **Real-time subscriptions** - Live updates
@@ -190,7 +249,7 @@
 
 ### Data Flow
 
-#### **Work Mode Flow (Document Analysis)**
+#### **Work Mode Flow (Document Analysis) - v2.0 with Docling**
 
 ```
 User uploads document
@@ -201,15 +260,36 @@ User uploads document
 └─────────┬─────────┘
           │
           v
-┌───────────────────────┐
-│ documentProcessor.ts  │ ─→ Extract text & metadata
-│  - processPDFDocument │     Create document chunks
-│  - processTextDocument│
-└─────────┬─────────────┘
-          │
+┌────────────────────────────────┐
+│ documentProcessor.ts           │ ─→ Send to backend
+│  - Convert file to Base64     │
+│  - Call mcpClient.processDoc() │
+└─────────┬──────────────────────┘
+          │ HTTP POST (Base64)
+          v
+┌─────────────────────────────────────────┐
+│  MCP Server (Python Backend - Port 8000)│
+│  ┌────────────────────────────────────┐ │
+│  │  Docling Processor (Primary)      │ │
+│  │  - Advanced table extraction      │ │
+│  │  - Structure preservation         │ │
+│  │  - OCR for scanned docs           │ │
+│  │  - Layout analysis                │ │
+│  │  - Multi-format support           │ │
+│  └────────────────────────────────────┘ │
+│  ┌────────────────────────────────────┐ │
+│  │  PyMuPDF Fallback (if Docling fails)│
+│  │  - Robust PDF extraction          │ │
+│  │  - Basic table detection          │ │
+│  └────────────────────────────────────┘ │
+└─────────┬───────────────────────────────┘
+          │ Return structured JSON
+          │ (content, tables, chunks, metadata)
           v
 ┌────────────────────┐
 │ App.tsx useEffect  │ ─→ Store in processedDocuments[]
+│                    │     Display table count
+│                    │     Show processor used
 └─────────┬──────────┘
           │
           v
@@ -217,7 +297,7 @@ User uploads document
 │ conversationService   │ ─→ Save to Supabase database
 └───────────────────────┘
 
-User asks question
+User asks question (e.g., "What is the net interest income?")
         │
         v
 ┌───────────────────┐
@@ -238,6 +318,8 @@ User asks question
           v
 ┌─────────────────────────┐
 │ handleDocumentAnalysis  │ ─→ Use OpenAI with context
+│                         │     Include extracted tables
+│                         │     Structured markdown chunks
 │  - Build prompt         │     Include document chunks
 │  - Call GPT-4o-mini     │     Extract answer
 └─────────┬───────────────┘
@@ -338,10 +420,15 @@ App.tsx (Root)
 
 ### Prerequisites
 
+#### **Required**
 - **Node.js** 18.x or higher
 - **npm** 9.x or higher
+- **Python** 3.9 or higher (for MCP backend server)
+- **pip** (Python package manager)
 - **OpenAI API Key** - Get from [OpenAI Platform](https://platform.openai.com/)
-- **Supabase Account** (Optional but recommended) - [Sign up](https://supabase.com/)
+
+#### **Optional**
+- **Supabase Account** - For conversation persistence - [Sign up](https://supabase.com/)
 
 ### Environment Setup
 
@@ -351,21 +438,34 @@ git clone https://github.com/yourusername/insights-b.git
 cd insights-b
 ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
 ```bash
 npm install
 ```
 
-3. **Create environment file**
+3. **Install backend (MCP server) dependencies**
+```bash
+cd mcp-server
+pip install -r requirements.txt
+cd ..
+```
+
+**Note:** Docling installation may take a few minutes as it downloads AI models (~500MB).
+
+4. **Create environment file**
 ```bash
 cp .env.example .env
 ```
 
-4. **Configure environment variables** (`.env` file):
+5. **Configure environment variables** (`.env` file):
 
 ```env
 # Required: OpenAI API Key
 VITE_OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Required: MCP Server URL (for document processing)
+# Default for local development:
+VITE_MCP_SERVER_URL=http://localhost:8000
 
 # Optional: Supabase (for conversation persistence)
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -374,10 +474,40 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 
 ### Development Setup
 
+#### **Option 1: Run Frontend + Backend Together (Recommended)**
+
+**Terminal 1 - Start MCP Backend Server:**
+```bash
+cd mcp-server
+python start.py
+```
+
+You should see:
+```
+✅ Docling initialized successfully
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+**Terminal 2 - Start Frontend Dev Server:**
+```bash
+npm run dev
+```
+
+**Open Browser:**
+```
+http://localhost:5173
+```
+
+#### **Option 2: Frontend Only (Limited Functionality)**
+
+If you want to run frontend only without document processing:
+
 1. **Start the development server**
 ```bash
 npm run dev
 ```
+
+**Note:** Document upload will not work without the MCP backend running.
 
 2. **Open your browser**
 ```
@@ -2497,18 +2627,64 @@ npm run build -- --mode analyze
 - Restart dev server after changing `.env`
 - Check OpenAI account status and billing
 
-#### 2. Document Processing Fails
+#### 2. MCP Backend Server Not Running
+
+**Error**: "Failed to process document" or "MCP call failed"
+
+**Solutions**:
+- **Start the MCP server** in a separate terminal:
+  ```bash
+  cd mcp-server
+  python start.py
+  ```
+- Verify server is running on port 8000:
+  ```bash
+  # Check if port 8000 is in use
+  netstat -ano | findstr :8000  # Windows
+  lsof -i :8000                  # Mac/Linux
+  ```
+- Check `.env` file has `VITE_MCP_SERVER_URL=http://localhost:8000`
+- **Restart frontend** after changing `.env`
+- Check MCP server terminal for error messages
+- Verify Python dependencies are installed:
+  ```bash
+  cd mcp-server
+  pip install -r requirements.txt
+  ```
+
+#### 3. Docling Installation Issues
+
+**Error**: "Docling not available" or pip installation fails
+
+**Solutions**:
+- Install Docling separately:
+  ```bash
+  pip install docling==2.9.0 docling-core==2.5.2
+  ```
+- Ensure Python version is 3.9+:
+  ```bash
+  python --version
+  ```
+- Try installing with verbose output:
+  ```bash
+  pip install -v docling==2.9.0
+  ```
+- If Docling fails, PyMuPDF fallback will be used automatically
+- Check disk space (Docling models require ~500MB)
+
+#### 4. Document Processing Fails (Backend Issues)
 
 **Error**: "❌ Document Processing Error"
 
 **Solutions**:
-- Ensure file size < 25MB
-- Check file format is supported (PDF, DOCX, TXT)
-- Try converting document to PDF
-- Check browser console for detailed error
-- Verify PDF.js worker is loading correctly
+- Ensure file size < 50MB
+- Supported formats: PDF, DOCX, PPTX, XLSX, Images (PNG/JPG), HTML, TXT
+- Check MCP server logs for detailed error
+- Try with a simple text file first to verify connection
+- Verify backend server is running (see issue #2)
+- For scanned PDFs, ensure OCR is working (Docling feature)
 
-#### 3. Supabase Connection Issues
+#### 5. Supabase Connection Issues
 
 **Error**: "Supabase credentials not found"
 
@@ -2521,7 +2697,7 @@ npm run build -- --mode analyze
   console.log(import.meta.env.VITE_SUPABASE_URL);
   ```
 
-#### 4. Web Search Not Working
+#### 6. Web Search Not Working
 
 **Error**: Search returns no results
 
@@ -2532,7 +2708,7 @@ npm run build -- --mode analyze
 - Check browser console for blocked requests
 - Ensure Web mode is selected
 
-#### 5. Slow Performance
+#### 7. Slow Performance
 
 **Solutions**:
 - Clear browser cache
@@ -2563,7 +2739,18 @@ if (DEBUG) {
 ```javascript
 // Check environment variables
 console.log('API Key:', import.meta.env.VITE_OPENAI_API_KEY ? 'Set' : 'Missing');
+console.log('MCP Server URL:', import.meta.env.VITE_MCP_SERVER_URL);
 console.log('Supabase:', import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing');
+
+// Check MCP server connectivity
+fetch('http://localhost:8000/tools/get_system_stats', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({})
+})
+  .then(res => res.json())
+  .then(data => console.log('✅ MCP Server connected:', data))
+  .catch(err => console.error('❌ MCP Server unreachable:', err));
 
 // Check Supabase connection
 console.log('Supabase enabled:', isSupabaseEnabled);

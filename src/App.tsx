@@ -120,14 +120,14 @@ function App() {
   useEffect(() => {
     const processUploadedFiles = async () => {
       if (uploadedFiles.length > 0 && processedDocuments.length !== uploadedFiles.length) {
-        setProcessingStatus('Processing documents...');
+        setProcessingStatus('🚀 Processing documents with Docling (Enterprise AI)...');
         try {
-          // Use client-side document processing
+          // Use backend Docling document processing
           const processed = await processDocuments(uploadedFiles);
-          
-          // Convert to expected format
+
+          // Convert to expected format with table support
           const processedDocs = processed.map(doc => ({
-            id: crypto.randomUUID(),
+            id: doc.id || crypto.randomUUID(),
             file_name: doc.fileName,
             content_preview: doc.content.substring(0, 500) + (doc.content.length > 500 ? '...' : ''),
             content: doc.content, // Store full content
@@ -137,27 +137,40 @@ function App() {
               page_count: doc.metadata.pageCount
             },
             chunk_count: doc.chunks.length,
-            chunks: doc.chunks
+            chunks: doc.chunks,
+            tables: doc.tables || [],  // Include extracted tables
+            processor: doc.processor,   // Track which processor was used
+            processedAt: doc.processedAt
           }));
-          
+
           setProcessedDocuments(processedDocs);
           setProcessingStatus('');
-          
+
           // Check if any documents failed to process
-          const failedDocs = processedDocs.filter(doc => doc.content_preview.includes('ERROR:'));
-          const successfulDocs = processedDocs.filter(doc => !doc.content_preview.includes('ERROR:'));
-          
+          const failedDocs = processedDocs.filter(doc => doc.content_preview.includes('❌'));
+          const successfulDocs = processedDocs.filter(doc => !doc.content_preview.includes('❌'));
+
+          // Calculate total tables extracted
+          const totalTables = successfulDocs.reduce((sum, doc) => sum + (doc.tables?.length || 0), 0);
+
           // Show processing summary
           let summary = `📄 **Document Processing Complete**\n\n`;
-          
+
           if (successfulDocs.length > 0) {
             summary += `✅ Successfully processed ${successfulDocs.length} document${successfulDocs.length !== 1 ? 's' : ''}:\n\n`;
-            summary += successfulDocs.map(doc => 
-              `• **${doc.file_name}** - ${doc.metadata.word_count} words, ${doc.metadata.page_count || 'N/A'} pages`
-            ).join('\n');
-            summary += `\n\n🎯 Ready for analysis! Ask me questions about your documents.`;
+            summary += successfulDocs.map(doc => {
+              const tableInfo = doc.tables && doc.tables.length > 0 ? `, ${doc.tables.length} table${doc.tables.length !== 1 ? 's' : ''}` : '';
+              const processorInfo = doc.processor ? ` (${doc.processor})` : '';
+              return `• **${doc.file_name}** - ${doc.metadata.word_count} words, ${doc.metadata.page_count || 'N/A'} pages${tableInfo}${processorInfo}`;
+            }).join('\n');
+
+            if (totalTables > 0) {
+              summary += `\n\n📊 **Extracted ${totalTables} structured table${totalTables !== 1 ? 's' : ''}** with preserved formatting!`;
+            }
+
+            summary += `\n\n🎯 Ready for analysis! Ask me questions about your documents and data.`;
           }
-          
+
           if (failedDocs.length > 0) {
             summary += `\n\n⚠️ ${failedDocs.length} document${failedDocs.length !== 1 ? 's' : ''} could not be processed:\n\n`;
             summary += failedDocs.map(doc => `• **${doc.file_name}** - Processing failed`).join('\n');
