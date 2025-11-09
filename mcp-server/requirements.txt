@@ -1,6 +1,6 @@
 fastmcp==0.2.0
 openai==1.54.3
-pypdf2==3.0.1
+pypdf>=3.0.0
 python-docx==1.1.0
 pillow>=10.3.0
 aiofiles==23.2.1
@@ -17,4 +17,6 @@ docling==2.9.0
 docling-core==2.5.2
 # Fallback document processor
 pymupdf==1.24.0
-python-magic==0.4.27
+# File type detection (Windows compatible)
+python-magic-bin==0.4.14; platform_system == "Windows"
+python-magic==0.4.27; platform_system != "Windows"

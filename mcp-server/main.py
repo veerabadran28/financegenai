@@ -20,7 +20,6 @@ from pydantic import BaseModel, Field
 import aiofiles
 import openai
 from PIL import Image, ImageDraw, ImageFont
-import PyPDF2
 import docx
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
