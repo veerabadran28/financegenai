@@ -1458,11 +1458,11 @@ async def get_system_stats() -> Dict[str, Any]:
         }
 
 if __name__ == "__main__":
-    import uvicorn
-    
     print("🚀 Starting FastMCP Document Analysis Server...")
     print("📋 Available tools:")
     print("   • process_document - Process uploaded documents")
+    print("   • get_document_full_data - Get full document data with tables")
+    print("   • get_document_tables - Get extracted tables from document")
     print("   • search_documents - Search through documents")
     print("   • setup_openai_client - Initialize OpenAI client")
     print("   • analyze_document - Analyze documents with AI")
@@ -1475,6 +1475,6 @@ if __name__ == "__main__":
     print("   • delete_document - Delete documents")
     print("   • get_system_stats - System statistics")
     print()
-    
-    # Run the FastMCP server
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # Run the FastMCP server using built-in run method
+    app.run(transport="sse", host="0.0.0.0", port=8000)
