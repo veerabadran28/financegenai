@@ -1,22 +1,22 @@
-fastmcp==0.2.0
-openai==1.54.3
-pypdf>=3.0.0
-python-docx==1.1.0
-pillow>=10.3.0
-aiofiles==23.2.1
-python-multipart==0.0.6
-uvicorn==0.24.0
-pydantic==2.5.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-markdown==3.5.1
-jinja2==3.1.2
-asyncio-throttle==1.0.2
+fastmcp
+openai
+pypdf
+python-docx
+pillow
+aiofiles
+python-multipart
+uvicorn
+pydantic
+numpy
+scikit-learn
+markdown
+jinja2
+asyncio-throttle
 # Enterprise document processing
-docling==2.9.0
-docling-core==2.5.2
+docling
+docling-core
 # Fallback document processor
-pymupdf==1.24.0
+pymupdf
 # File type detection (Windows compatible)
-python-magic-bin==0.4.14; platform_system == "Windows"
-python-magic==0.4.27; platform_system != "Windows"
+python-magic-bin; platform_system == "Windows"
+python-magic; platform_system != "Windows"
