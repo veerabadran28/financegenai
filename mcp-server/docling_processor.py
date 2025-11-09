@@ -26,7 +26,14 @@ except ImportError:
 
 # Fallback processor
 import fitz  # PyMuPDF
-import magic
+
+# Optional file type detection (may not be available on all systems)
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+    logging.warning("python-magic not available, file type detection will be limited")
 
 logger = logging.getLogger(__name__)
 
