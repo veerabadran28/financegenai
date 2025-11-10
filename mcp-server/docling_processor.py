@@ -44,27 +44,11 @@ class DocumentProcessor:
         self.converter = None
         if DOCLING_AVAILABLE:
             try:
-                # Initialize Docling with optimized settings
-                # Note: Modern Docling versions handle backend automatically
-                pipeline_options = PdfPipelineOptions()
-
-                # Set options if they exist (API compatibility)
-                try:
-                    pipeline_options.do_ocr = True  # Enable OCR for scanned docs
-                except AttributeError:
-                    logger.debug("do_ocr option not available in this Docling version")
-
-                try:
-                    pipeline_options.do_table_structure = True  # Extract table structure
-                except AttributeError:
-                    logger.debug("do_table_structure option not available in this Docling version")
-
-                self.converter = DocumentConverter(
-                    format_options={
-                        InputFormat.PDF: pipeline_options,
-                    }
-                )
-                logger.info("✅ Docling initialized successfully")
+                # Initialize Docling with default settings
+                # Let Docling handle backend and options automatically
+                # This ensures compatibility across different Docling versions
+                self.converter = DocumentConverter()
+                logger.info("✅ Docling initialized successfully with default settings")
             except Exception as e:
                 logger.error(f"Failed to initialize Docling: {e}")
                 logger.exception("Docling initialization details:")
