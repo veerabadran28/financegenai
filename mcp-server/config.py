@@ -7,6 +7,12 @@ Centralized configuration for AWS Textract, local processing, and more
 import os
 from typing import Optional
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file from the same directory as this config file
+config_dir = Path(__file__).parent
+env_path = config_dir / '.env'
+load_dotenv(dotenv_path=env_path)
 
 
 class ProcessorConfig:
