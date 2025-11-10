@@ -1506,6 +1506,7 @@ if __name__ == "__main__":
         """REST API endpoint for calling MCP tools"""
         try:
             # Get the tool function from app
+            # FastMCP wraps functions in FunctionTool objects, so we need to access the underlying function
             tools = {
                 'process_document': process_document,
                 'get_document_full_data': get_document_full_data,
@@ -1525,8 +1526,23 @@ if __name__ == "__main__":
             if tool_name not in tools:
                 raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
 
-            # Call the tool function with the provided arguments
-            tool_func = tools[tool_name]
+            # Get the tool (which may be a FunctionTool wrapper)
+            tool_obj = tools[tool_name]
+
+            # If it's a FunctionTool object, get the underlying function
+            if hasattr(tool_obj, 'fn'):
+                tool_func = tool_obj.fn
+            elif hasattr(tool_obj, '_fn'):
+                tool_func = tool_obj._fn
+            elif hasattr(tool_obj, 'func'):
+                tool_func = tool_obj.func
+            elif callable(tool_obj):
+                # If it's directly callable, use it
+                tool_func = tool_obj
+            else:
+                raise HTTPException(status_code=500, detail=f"Cannot access function for tool '{tool_name}'")
+
+            # Call the actual function with the provided arguments
             result = await tool_func(**request)
 
             return result
