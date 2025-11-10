@@ -120,9 +120,9 @@ function App() {
   useEffect(() => {
     const processUploadedFiles = async () => {
       if (uploadedFiles.length > 0 && processedDocuments.length !== uploadedFiles.length) {
-        setProcessingStatus('🚀 Processing documents with Docling (Enterprise AI)...');
+        setProcessingStatus('🚀 Processing documents with hybrid AI processor...');
         try {
-          // Use backend Docling document processing
+          // Use backend hybrid document processing (AWS Textract + local fallback)
           const processed = await processDocuments(uploadedFiles);
 
           // Convert to expected format with table support

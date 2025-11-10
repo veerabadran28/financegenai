@@ -123,7 +123,7 @@ class MCPClient {
   }
 
   /**
-   * Process a document file with Docling (enterprise-grade processing)
+   * Process a document file with hybrid processing (AWS Textract + local fallback)
    */
   async processDocument(file: File): Promise<MCPResponse<ProcessedDocument>> {
     try {
