@@ -119,8 +119,11 @@ class LocalProcessor:
                     chunk_id += 1
 
                 # Try to extract tables (basic detection with PyMuPDF)
-                tables_on_page = self._extract_tables_pymupdf(page, page_num + 1)
-                tables.extend(tables_on_page)
+                # Note: If pdfplumber is available, these will be replaced later
+                # Skip PyMuPDF table extraction if pdfplumber is available (to avoid warnings)
+                if not PDFPLUMBER_AVAILABLE:
+                    tables_on_page = self._extract_tables_pymupdf(page, page_num + 1)
+                    tables.extend(tables_on_page)
 
             # Close document after processing
             doc.close()

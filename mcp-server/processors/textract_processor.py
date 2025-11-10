@@ -135,26 +135,18 @@ class TextractProcessor:
 
     def _detect_document_text(self, doc_bytes: bytes) -> dict:
         """Call Textract DetectDocumentText API (simple text extraction)"""
-        try:
-            response = self.client.detect_document_text(
-                Document={'Bytes': doc_bytes}
-            )
-            return response
-        except Exception as e:
-            logger.error(f"DetectDocumentText API call failed: {e}")
-            raise
+        response = self.client.detect_document_text(
+            Document={'Bytes': doc_bytes}
+        )
+        return response
 
     def _analyze_document(self, doc_bytes: bytes) -> dict:
         """Call Textract AnalyzeDocument API (with tables and forms)"""
-        try:
-            response = self.client.analyze_document(
-                Document={'Bytes': doc_bytes},
-                FeatureTypes=['TABLES', 'FORMS']  # Enable table and form extraction
-            )
-            return response
-        except Exception as e:
-            logger.error(f"AnalyzeDocument API call failed: {e}")
-            raise
+        response = self.client.analyze_document(
+            Document={'Bytes': doc_bytes},
+            FeatureTypes=['TABLES', 'FORMS']  # Enable table and form extraction
+        )
+        return response
 
     def _extract_text_from_blocks(self, blocks: List[dict]) -> str:
         """Extract full text from Textract blocks in reading order"""
