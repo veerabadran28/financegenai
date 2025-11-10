@@ -27,8 +27,8 @@ import numpy as np
 import markdown
 from jinja2 import Template
 
-# Import Docling processor
-from docling_processor import get_processor
+# Import Enterprise Document Processor (AWS Textract + Local fallback)
+from document_processor import get_processor
 
 # Initialize FastMCP app
 app = FastMCP("Document Analysis Server")

@@ -13,11 +13,18 @@ scikit-learn
 markdown
 jinja2
 asyncio-throttle
-# Enterprise document processing
-docling
-docling-core
-# Fallback document processor
-pymupdf
+
+# Enterprise document processing with AWS Textract
+boto3>=1.34.0
+botocore>=1.34.0
+
+# Enhanced local document processing
+pymupdf>=1.23.0
+pdfplumber>=0.10.0
+
+# Configuration management
+python-dotenv>=1.0.0
+
 # File type detection (Windows compatible)
 python-magic-bin; platform_system == "Windows"
 python-magic; platform_system != "Windows"

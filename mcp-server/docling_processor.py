@@ -13,6 +13,12 @@ from typing import Dict, List, Optional, Tuple, Any
 import logging
 from datetime import datetime
 
+# Fix Windows symlink issues with HuggingFace model downloads
+# This prevents WinError 1314 privilege errors on Windows
+os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+if os.name == 'nt':  # Windows
+    os.environ['HF_HUB_DISABLE_SYMLINKS'] = '1'
+
 # Docling imports
 try:
     from docling.document_converter import DocumentConverter
@@ -79,8 +85,8 @@ class DocumentProcessor:
                     logger.info("✅ Processed with Docling")
                     return result
 
-            # Fallback to PyMuPDF
-            logger.info("Using PyMuPDF fallback processor")
+            # Fallback to PyMuPDF (reliable and fast)
+            logger.info("✅ Processing with PyMuPDF (fallback)")
             result = await self._process_with_pymupdf(file_path, file_type)
             return result
 
@@ -131,7 +137,12 @@ class DocumentProcessor:
             }
 
         except Exception as e:
-            logger.error(f"Docling processing error: {e}")
+            error_msg = str(e)
+            # Windows symlink errors are expected and handled by fallback
+            if "WinError 1314" in error_msg or "privilege" in error_msg.lower():
+                logger.warning(f"Docling unavailable (Windows permissions): falling back to PyMuPDF")
+            else:
+                logger.warning(f"Docling processing failed: {error_msg} - using PyMuPDF fallback")
             return None
 
     def _extract_tables_from_docling(self, result) -> List[Dict[str, Any]]:
