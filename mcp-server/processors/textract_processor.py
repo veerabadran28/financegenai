@@ -18,15 +18,6 @@ except ImportError:
     BOTO3_AVAILABLE = False
     logging.warning("boto3 not available - AWS Textract will not work")
 
-# Import PyMuPDF for PDF validation
-try:
-    import fitz  # PyMuPDF
-    PYMUPDF_AVAILABLE = True
-except ImportError:
-    PYMUPDF_AVAILABLE = False
-    logging.warning("PyMuPDF not available - PDF validation will be limited")
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -74,49 +65,6 @@ class TextractProcessor:
         supported_exts = ['.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif']
         return ext in supported_exts
 
-    def _validate_pdf(self, file_path: str) -> tuple[bool, str]:
-        """
-        Validate PDF for Textract compatibility
-
-        Returns:
-            (is_valid, error_message) tuple
-        """
-        if not PYMUPDF_AVAILABLE:
-            # Can't validate without PyMuPDF, assume it's OK
-            return (True, "")
-
-        try:
-            # Check file size (Textract limit: 10MB for synchronous API)
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            if file_size_mb > 10:
-                return (False, f"PDF too large ({file_size_mb:.1f}MB > 10MB limit)")
-
-            # Open PDF to check for encryption and validity
-            doc = fitz.open(file_path)
-
-            # Check if PDF is encrypted
-            if doc.is_encrypted:
-                doc.close()
-                return (False, "PDF is encrypted/password-protected")
-
-            # Check if PDF has content
-            if len(doc) == 0:
-                doc.close()
-                return (False, "PDF has no pages")
-
-            # Check for very large page counts (may cause issues)
-            if len(doc) > 3000:
-                doc.close()
-                return (False, f"PDF has too many pages ({len(doc)} > 3000)")
-
-            doc.close()
-            return (True, "")
-
-        except Exception as e:
-            logger.warning(f"PDF validation error: {e}")
-            # If validation fails, return error
-            return (False, f"PDF validation failed: {str(e)}")
-
     async def process_document(
         self,
         file_path: str,
@@ -135,17 +83,10 @@ class TextractProcessor:
         logger.info(f"Processing document with AWS Textract: {file_path}")
 
         try:
-            # Validate format before sending to Textract
+            # Basic format check
             if not self._is_supported_format(file_path, file_type):
-                logger.warning(f"Unsupported format for Textract: {file_type} - {file_path}")
+                logger.debug(f"Format not supported by Textract: {file_type}")
                 raise Exception(f"Format not supported by Textract: {file_type}. Supported: PDF, PNG, JPG, TIFF")
-
-            # For PDFs, do additional validation
-            if file_type == 'application/pdf' or file_path.lower().endswith('.pdf'):
-                is_valid, error_msg = self._validate_pdf(file_path)
-                if not is_valid:
-                    logger.warning(f"PDF validation failed: {error_msg}")
-                    raise Exception(f"PDF not compatible with Textract: {error_msg}")
 
             # Read document bytes
             with open(file_path, 'rb') as doc_file:
@@ -180,17 +121,16 @@ class TextractProcessor:
             error_code = e.response.get('Error', {}).get('Code', 'Unknown')
             error_msg = e.response.get('Error', {}).get('Message', str(e))
 
-            # Provide helpful message for unsupported documents
+            # Handle unsupported documents gracefully (will fall back to local processing)
             if error_code == 'UnsupportedDocumentException':
-                logger.warning(f"AWS Textract rejected document: {error_msg}")
-                logger.info("This PDF may have special features (ADA compliance, advanced security, etc.) that Textract doesn't support")
-                raise Exception(f"PDF incompatible with Textract (likely has special features like ADA compliance or advanced security)")
+                logger.info(f"Document not compatible with AWS Textract (may have special PDF features)")
+                raise Exception(f"Textract incompatible format - will use local processing")
             else:
                 logger.error(f"AWS Textract API error ({error_code}): {error_msg}")
                 raise Exception(f"Textract API error: {error_code} - {error_msg}")
 
         except Exception as e:
-            logger.error(f"Textract processing error: {e}")
+            logger.debug(f"Textract processing error: {e}")
             raise
 
     def _detect_document_text(self, doc_bytes: bytes) -> dict:
