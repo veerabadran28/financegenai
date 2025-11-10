@@ -48,7 +48,7 @@
 
 ## Overview
 
-**Insights-B v2.0** is an enterprise-grade document analysis chatbot that combines the power of GPT-4o-mini with **Docling** (IBM Research) for advanced document processing. With enterprise table extraction, OCR capabilities, and support for 8+ file formats, it delivers accurate insights from complex financial documents and reports. It operates in two intelligent modes:
+**Insights-B v2.0** is an enterprise-grade document analysis chatbot that combines the power of GPT-4o-mini with **AWS Textract** and enhanced local processing for advanced document analysis. With enterprise-grade OCR, table extraction, and support for 8+ file formats, it delivers accurate insights from complex financial documents and reports. It operates in two intelligent modes:
 
 ### 🌐 Web Mode
 - **Real-time web search** using DuckDuckGo
@@ -59,8 +59,9 @@
 
 ### 💼 Work Mode (Enhanced with Enterprise AI)
 - **Advanced document analysis** (PDF, DOCX, PPTX, XLSX, Images, HTML, TXT)
-- **Enterprise table extraction** with Docling (IBM Research)
-- **OCR capability** for scanned documents
+- **Hybrid document processing**: AWS Textract (primary) + local fallback (PyMuPDF + pdfplumber)
+- **Enterprise-grade OCR** for scanned documents
+- **Advanced table extraction** with structure preservation
 - **Intelligent Q&A** over uploaded documents with preserved structure
 - **Smart diagram generation** (flowcharts, charts, tables)
 - **Conversation memory** with Supabase
@@ -79,17 +80,21 @@
 ### 📄 **Enterprise Document Processing** (v2.0 - New!)
 - **Supported Formats**: PDF, DOCX, PPTX, XLSX, Images (PNG/JPG), HTML, TXT, CSV, JSON
 - **Backend Processing** with Python MCP Server (FastMCP)
-- **Docling Integration** (IBM Research) - Primary processor
-  - Advanced table extraction with structure preservation
-  - Layout analysis and section detection
-  - OCR for scanned documents
-  - Multi-column document support
-  - Markdown output optimized for LLMs
-- **PyMuPDF Fallback** - Reliable backup processor
+- **Hybrid Processing Architecture**:
+  - **AWS Textract** (Primary) - Enterprise-grade cloud processing
+    - Advanced OCR for scanned documents
+    - Cell-level table extraction with structure preservation
+    - Form and key-value pair detection
+    - Multi-page document support
+  - **Local Processors** (Fallback) - Offline processing
+    - PyMuPDF for fast text extraction
+    - pdfplumber for enhanced table detection
+    - No cloud dependencies, 100% offline
 - **Intelligent Chunking** for RAG (Retrieval Augmented Generation)
 - **Metadata extraction** (word count, pages, author, tables)
 - **Multi-document support** with cross-referencing
 - **Table Preservation**: Financial data, reports, and structured data remain intact
+- **Configuration-driven**: Easy to enable/disable AWS or use local-only mode
 
 ### 📊 **Dynamic Visualizations**
 - **Flowcharts**: Process flows, decision trees
@@ -143,9 +148,9 @@
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │          Python MCP Server (FastMCP) - Port 8000            ││
 │  │  ┌───────────────────────────────────────────────────────┐ ││
-│  │  │  🚀 Docling Processor (Primary - Enterprise AI)       │ ││
-│  │  │  - Advanced table extraction with structure           │ ││
-│  │  │  - Multi-format support (PDF, DOCX, PPTX, XLSX, etc) │ ││
+│  │  │  🚀 Hybrid Processor (AWS Textract + Local)          │ ││
+│  │  │  - AWS Textract for OCR and advanced tables          │ ││
+│  │  │  - Local fallback: PyMuPDF + pdfplumber              │ ││
 │  │  │  - OCR for scanned documents                          │ ││
 │  │  │  - Layout analysis & section detection               │ ││
 │  │  │  - Markdown output optimized for LLMs                 │ ││
@@ -189,12 +194,12 @@
 └──────────────────────────────────────────────────────────────────┘
 
 Key Enhancements in v2.0:
-✅ Enterprise document processing with Docling
-✅ Advanced table extraction (preserves structure)
+✅ Hybrid document processing (AWS Textract + local fallback)
+✅ Enterprise-grade OCR and table extraction
 ✅ Multi-format support (8+ file types)
-✅ OCR capability for scanned documents
+✅ Configuration-driven processor selection
 ✅ Backend processing (scalable architecture)
-✅ Dual-processor system (Docling + PyMuPDF fallback)
+✅ No HuggingFace dependencies (enterprise-friendly)
 ```
 
 ### Technology Stack
@@ -212,9 +217,12 @@ Key Enhancements in v2.0:
 - **RAG Pattern** - Document context retrieval
 
 #### **Document Processing** (Enterprise Backend)
-- **Docling 2.9.0** - IBM Research enterprise document processor
-  - Advanced table extraction with structure preservation
-  - Multi-format support (PDF, DOCX, PPTX, XLSX, Images, HTML, TXT)
+- **AWS Textract** - Enterprise cloud document processing
+  - Advanced OCR and table extraction
+  - Cell-level table accuracy
+  - Form and key-value extraction
+- **pdfplumber** - Enhanced local table extraction
+- **PyMuPDF** - Fast local text extraction
   - OCR capability for scanned documents
   - Layout analysis and section detection
   - Markdown output optimized for LLMs
@@ -249,7 +257,7 @@ Key Enhancements in v2.0:
 
 ### Data Flow
 
-#### **Work Mode Flow (Document Analysis) - v2.0 with Docling**
+#### **Work Mode Flow (Document Analysis) - v2.0 Hybrid Processing**
 
 ```
 User uploads document
@@ -270,17 +278,16 @@ User uploads document
 ┌─────────────────────────────────────────┐
 │  MCP Server (Python Backend - Port 8000)│
 │  ┌────────────────────────────────────┐ │
-│  │  Docling Processor (Primary)      │ │
-│  │  - Advanced table extraction      │ │
-│  │  - Structure preservation         │ │
-│  │  - OCR for scanned docs           │ │
-│  │  - Layout analysis                │ │
-│  │  - Multi-format support           │ │
+│  │  AWS Textract (Primary)           │ │
+│  │  - Enterprise OCR                 │ │
+│  │  - Cell-level table extraction    │ │
+│  │  - Form & key-value detection     │ │
+│  │  - Cloud-based processing         │ │
 │  └────────────────────────────────────┘ │
 │  ┌────────────────────────────────────┐ │
-│  │  PyMuPDF Fallback (if Docling fails)│
-│  │  - Robust PDF extraction          │ │
-│  │  - Basic table detection          │ │
+│  │  Local Fallback                   │ │
+│  │  - PyMuPDF (text extraction)      │ │
+│  │  - pdfplumber (enhanced tables)   │ │
 │  └────────────────────────────────────┘ │
 └─────────┬───────────────────────────────┘
           │ Return structured JSON
@@ -450,7 +457,7 @@ pip install -r requirements.txt
 cd ..
 ```
 
-**Note:** Docling installation may take a few minutes as it downloads AI models (~500MB).
+**Note:** The system supports both AWS Textract (cloud) and local processing. See `mcp-server/.env.example` for configuration.
 
 4. **Create environment file**
 ```bash
@@ -484,7 +491,8 @@ python start.py
 
 You should see:
 ```
-✅ Docling initialized successfully
+✅ Local processor initialized (PyMuPDF + pdfplumber)
+📄 Document Processor Mode: local-only (PyMuPDF + pdfplumber)
 INFO:     Uvicorn running on http://0.0.0.0:8000
 ```
 
@@ -2652,25 +2660,29 @@ npm run build -- --mode analyze
   pip install -r requirements.txt
   ```
 
-#### 3. Docling Installation Issues
+#### 3. Document Processing Configuration
 
-**Error**: "Docling not available" or pip installation fails
+**Configure processing mode** in `mcp-server/.env`:
 
-**Solutions**:
-- Install Docling separately:
-  ```bash
-  pip install docling==2.9.0 docling-core==2.5.2
-  ```
-- Ensure Python version is 3.9+:
-  ```bash
-  python --version
-  ```
-- Try installing with verbose output:
-  ```bash
-  pip install -v docling==2.9.0
-  ```
-- If Docling fails, PyMuPDF fallback will be used automatically
-- Check disk space (Docling models require ~500MB)
+**Local-only mode** (no AWS, good for development):
+```bash
+AWS_TEXTRACT_ENABLED=false
+USE_LOCAL_FALLBACK=true
+```
+
+**AWS Textract mode** (enterprise, requires credentials):
+```bash
+AWS_TEXTRACT_ENABLED=true
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+```
+
+**Install dependencies**:
+```bash
+cd mcp-server
+pip install boto3 pdfplumber pymupdf
+```
 
 #### 4. Document Processing Fails (Backend Issues)
 
@@ -2682,7 +2694,7 @@ npm run build -- --mode analyze
 - Check MCP server logs for detailed error
 - Try with a simple text file first to verify connection
 - Verify backend server is running (see issue #2)
-- For scanned PDFs, ensure OCR is working (Docling feature)
+- For scanned PDFs with OCR, enable AWS Textract (local processors have limited OCR)
 
 #### 5. Supabase Connection Issues
 

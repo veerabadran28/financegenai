@@ -115,7 +115,10 @@ async def process_document(
     file_type: str
 ) -> Dict[str, Any]:
     """
-    Process uploaded documents using enterprise-grade Docling processor.
+    Process uploaded documents using enterprise document processor.
+    Primary: AWS Textract (OCR, tables, forms)
+    Fallback: PyMuPDF + pdfplumber (local processing)
+
     Supports: PDF, DOCX, PPTX, XLSX, Images (with OCR), HTML, TXT
 
     Args:
@@ -139,7 +142,7 @@ async def process_document(
             # Get processor instance
             processor = get_processor()
 
-            # Process document with Docling (+ PyMuPDF fallback)
+            # Process document (AWS Textract or local fallback based on config)
             result = await processor.process_document(temp_path, file_type)
 
             # Generate unique document ID
