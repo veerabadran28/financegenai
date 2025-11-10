@@ -18,7 +18,6 @@ try:
     from docling.document_converter import DocumentConverter
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
-    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
     DOCLING_AVAILABLE = True
 except ImportError:
     DOCLING_AVAILABLE = False
@@ -45,19 +44,14 @@ class DocumentProcessor:
         self.converter = None
         if DOCLING_AVAILABLE:
             try:
-                # Initialize Docling with optimized settings
-                pipeline_options = PdfPipelineOptions()
-                pipeline_options.do_ocr = True  # Enable OCR for scanned docs
-                pipeline_options.do_table_structure = True  # Extract table structure
-
-                self.converter = DocumentConverter(
-                    format_options={
-                        InputFormat.PDF: pipeline_options,
-                    }
-                )
-                logger.info("✅ Docling initialized successfully")
+                # Initialize Docling with default settings
+                # Let Docling handle backend and options automatically
+                # This ensures compatibility across different Docling versions
+                self.converter = DocumentConverter()
+                logger.info("✅ Docling initialized successfully with default settings")
             except Exception as e:
                 logger.error(f"Failed to initialize Docling: {e}")
+                logger.exception("Docling initialization details:")
                 self.converter = None
 
     async def process_document(
@@ -350,8 +344,11 @@ class DocumentProcessor:
             tables = []
             chunk_id = 0
 
+            # Get page count before processing
+            page_count = len(doc)
+
             # Process each page
-            for page_num in range(len(doc)):
+            for page_num in range(page_count):
                 page = doc[page_num]
 
                 # Extract text
@@ -375,11 +372,12 @@ class DocumentProcessor:
                 tables_on_page = self._extract_tables_pymupdf(page, page_num + 1)
                 tables.extend(tables_on_page)
 
+            # Close document after processing
             doc.close()
 
             # Create metadata
             metadata = {
-                "pageCount": len(doc),
+                "pageCount": page_count,
                 "wordCount": len(full_text.split()),
                 "characterCount": len(full_text),
                 "language": "en"
@@ -395,7 +393,7 @@ class DocumentProcessor:
                 "tables": tables,
                 "layout": {
                     "hasMultipleColumns": False,
-                    "pageCount": len(doc),
+                    "pageCount": page_count,
                     "sections": []
                 },
                 "chunks": chunks,
