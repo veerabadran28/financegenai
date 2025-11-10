@@ -1529,18 +1529,29 @@ if __name__ == "__main__":
             # Get the tool (which may be a FunctionTool wrapper)
             tool_obj = tools[tool_name]
 
+            # Debug: print tool object type and attributes
+            print(f"Tool '{tool_name}' type: {type(tool_obj)}")
+            print(f"Tool '{tool_name}' attributes: {dir(tool_obj)}")
+
             # If it's a FunctionTool object, get the underlying function
             if hasattr(tool_obj, 'fn'):
                 tool_func = tool_obj.fn
+                print(f"Using tool_obj.fn")
             elif hasattr(tool_obj, '_fn'):
                 tool_func = tool_obj._fn
+                print(f"Using tool_obj._fn")
             elif hasattr(tool_obj, 'func'):
                 tool_func = tool_obj.func
+                print(f"Using tool_obj.func")
+            elif hasattr(tool_obj, '__wrapped__'):
+                tool_func = tool_obj.__wrapped__
+                print(f"Using tool_obj.__wrapped__")
             elif callable(tool_obj):
                 # If it's directly callable, use it
                 tool_func = tool_obj
+                print(f"Using tool_obj directly (callable)")
             else:
-                raise HTTPException(status_code=500, detail=f"Cannot access function for tool '{tool_name}'")
+                raise HTTPException(status_code=500, detail=f"Cannot access function for tool '{tool_name}'. Attributes: {dir(tool_obj)}")
 
             # Call the actual function with the provided arguments
             result = await tool_func(**request)
