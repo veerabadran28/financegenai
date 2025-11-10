@@ -119,7 +119,9 @@ class DocumentProcessor:
                     logger.warning(f"Textract processing failed: {e}")
                     if not self.config.USE_LOCAL_FALLBACK:
                         raise  # No fallback available
-                    logger.info("Falling back to local processing...")
+                    logger.info("⚠️ Falling back to local processing...")
+                    if self.config.LOG_PROCESSOR_SELECTION:
+                        logger.info("📊 Selected: Local processor (PyMuPDF + pdfplumber) [fallback]")
 
             # Use local processor (either as primary or fallback)
             if self.local_processor:

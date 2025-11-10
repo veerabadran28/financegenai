@@ -7,11 +7,15 @@ No cloud dependencies, runs entirely offline
 
 import os
 import logging
+import warnings
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 # PyMuPDF for fast text extraction
 import fitz  # PyMuPDF
+
+# Suppress PyMuPDF table detection warning (we use pdfplumber for tables)
+warnings.filterwarnings('ignore', message='.*pymupdf_layout.*')
 
 # pdfplumber for superior table extraction
 try:

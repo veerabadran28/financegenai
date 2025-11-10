@@ -1,6 +1,8 @@
 /**
  * Document Processor - Backend Integration
- * All document processing now happens on the backend with Docling
+ * All document processing happens on the backend with hybrid processing:
+ * - AWS Textract (primary) for enterprise OCR and table extraction
+ * - Local processing (PyMuPDF + pdfplumber) as fallback
  * No more client-side PDF.js processing
  */
 
@@ -8,7 +10,7 @@ import { FileAttachment, ProcessedDocument } from '../types';
 import { mcpClient } from '../services/mcpClient';
 
 /**
- * Process documents using backend Docling service
+ * Process documents using backend hybrid processor
  * Supports: PDF, DOCX, PPTX, XLSX, Images (with OCR), HTML, TXT
  */
 export const processDocuments = async (

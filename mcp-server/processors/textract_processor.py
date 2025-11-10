@@ -46,6 +46,26 @@ class TextractProcessor:
             logger.error(f"Failed to initialize AWS Textract client: {e}")
             raise
 
+    def _is_supported_format(self, file_path: str, file_type: str) -> bool:
+        """Check if document format is supported by AWS Textract"""
+        # Textract supports: PDF, PNG, JPG, JPEG, TIFF
+        supported_types = [
+            'application/pdf',
+            'image/png',
+            'image/jpeg',
+            'image/jpg',
+            'image/tiff'
+        ]
+
+        # Check MIME type
+        if file_type in supported_types:
+            return True
+
+        # Check file extension as fallback
+        ext = Path(file_path).suffix.lower()
+        supported_exts = ['.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif']
+        return ext in supported_exts
+
     async def process_document(
         self,
         file_path: str,
@@ -64,6 +84,11 @@ class TextractProcessor:
         logger.info(f"Processing document with AWS Textract: {file_path}")
 
         try:
+            # Validate format before sending to Textract
+            if not self._is_supported_format(file_path, file_type):
+                logger.warning(f"Unsupported format for Textract: {file_type} - {file_path}")
+                raise Exception(f"Format not supported by Textract: {file_type}. Supported: PDF, PNG, JPG, TIFF")
+
             # Read document bytes
             with open(file_path, 'rb') as doc_file:
                 doc_bytes = doc_file.read()

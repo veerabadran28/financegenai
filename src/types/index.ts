@@ -92,7 +92,7 @@ export interface ProcessedDocument {
   chunks: DocumentChunk[];
   tables?: ExtractedTable[];  // NEW: Extracted tables
   layout?: DocumentLayout;     // NEW: Document layout
-  processor?: string;          // NEW: Which processor was used (docling/pymupdf_fallback)
+  processor?: string;          // Processor used (textract_analyze/local_pymupdf_pdfplumber)
   processedAt?: string;        // NEW: Processing timestamp
 }
 
