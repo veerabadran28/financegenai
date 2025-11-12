@@ -46,6 +46,52 @@ class LocalProcessor:
         else:
             logger.info("✅ Local processor initialized (PyMuPDF only)")
 
+    def _is_pdf_tagged(self, file_path: str) -> bool:
+        """
+        Check if a PDF is tagged (has accessibility/structure information)
+
+        A tagged PDF contains structure information that makes it accessible.
+        This is indicated by the presence of StructTreeRoot in the PDF catalog.
+
+        Args:
+            file_path: Path to the PDF file
+
+        Returns:
+            True if PDF is tagged, False otherwise
+        """
+        try:
+            doc = fitz.open(file_path)
+
+            # Get the PDF catalog
+            catalog = doc.pdf_catalog()
+
+            # Check for StructTreeRoot - primary indicator of tagged PDF
+            has_struct_tree = catalog.get('StructTreeRoot') is not None
+
+            # Check MarkInfo for additional confirmation
+            mark_info = catalog.get('MarkInfo')
+            is_marked = False
+            if mark_info is not None:
+                # The 'Marked' key in MarkInfo indicates if the PDF is marked as tagged
+                is_marked = mark_info.get('Marked', False)
+
+            doc.close()
+
+            # PDF is considered tagged if it has StructTreeRoot or is marked
+            is_tagged = has_struct_tree or is_marked
+
+            if is_tagged:
+                logger.info(f"✅ PDF is tagged (accessible): {file_path}")
+            else:
+                logger.info(f"ℹ️  PDF is not tagged: {file_path}")
+
+            return is_tagged
+
+        except Exception as e:
+            logger.warning(f"Could not determine if PDF is tagged: {e}")
+            # If we can't determine, assume it's not tagged to be safe
+            return False
+
     async def process_document(
         self,
         file_path: str,
@@ -64,6 +110,39 @@ class LocalProcessor:
         logger.info(f"Processing document with local processor: {file_path}")
 
         try:
+            # Check if this is a PDF file
+            is_pdf = file_type == 'application/pdf' or file_path.lower().endswith('.pdf')
+
+            # If it's a PDF, check if it's tagged before processing
+            if is_pdf:
+                is_tagged = self._is_pdf_tagged(file_path)
+
+                if not is_tagged:
+                    logger.warning(f"PDF is not tagged - skipping pre-processing: {file_path}")
+                    return {
+                        "success": False,
+                        "processor": "local_pymupdf_pdfplumber",
+                        "fileName": os.path.basename(file_path),
+                        "content": "",
+                        "type": file_type,
+                        "metadata": {
+                            "pageCount": 0,
+                            "wordCount": 0,
+                            "characterCount": 0,
+                            "language": "en",
+                            "isTagged": False
+                        },
+                        "tables": [],
+                        "layout": {
+                            "hasMultipleColumns": False,
+                            "pageCount": 0,
+                            "sections": []
+                        },
+                        "chunks": [],
+                        "processedAt": datetime.now().isoformat(),
+                        "error": "PDF is not tagged - pre-processing is only supported for tagged PDFs"
+                    }
+
             # Extract text with PyMuPDF (fast and reliable)
             pymupdf_data = self._process_with_pymupdf(file_path)
 
@@ -76,6 +155,10 @@ class LocalProcessor:
             # Update metadata
             pymupdf_data['processor'] = 'local_pymupdf_pdfplumber' if self.enable_pdfplumber else 'local_pymupdf'
             pymupdf_data['type'] = file_type
+
+            # Add isTagged flag to metadata if it's a PDF
+            if is_pdf:
+                pymupdf_data['metadata']['isTagged'] = True
 
             return pymupdf_data
 

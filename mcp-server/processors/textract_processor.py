@@ -18,6 +18,13 @@ except ImportError:
     BOTO3_AVAILABLE = False
     logging.warning("boto3 not available - AWS Textract will not work")
 
+try:
+    import fitz  # PyMuPDF for PDF tagging detection
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+    logging.warning("PyMuPDF not available - PDF tag detection will not work")
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,6 +72,56 @@ class TextractProcessor:
         supported_exts = ['.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif']
         return ext in supported_exts
 
+    def _is_pdf_tagged(self, file_path: str) -> bool:
+        """
+        Check if a PDF is tagged (has accessibility/structure information)
+
+        A tagged PDF contains structure information that makes it accessible.
+        This is indicated by the presence of StructTreeRoot in the PDF catalog.
+
+        Args:
+            file_path: Path to the PDF file
+
+        Returns:
+            True if PDF is tagged, False otherwise
+        """
+        if not PYMUPDF_AVAILABLE:
+            logger.warning("PyMuPDF not available - cannot detect PDF tags")
+            return False
+
+        try:
+            doc = fitz.open(file_path)
+
+            # Get the PDF catalog
+            catalog = doc.pdf_catalog()
+
+            # Check for StructTreeRoot - primary indicator of tagged PDF
+            has_struct_tree = catalog.get('StructTreeRoot') is not None
+
+            # Check MarkInfo for additional confirmation
+            mark_info = catalog.get('MarkInfo')
+            is_marked = False
+            if mark_info is not None:
+                # The 'Marked' key in MarkInfo indicates if the PDF is marked as tagged
+                is_marked = mark_info.get('Marked', False)
+
+            doc.close()
+
+            # PDF is considered tagged if it has StructTreeRoot or is marked
+            is_tagged = has_struct_tree or is_marked
+
+            if is_tagged:
+                logger.info(f"✅ PDF is tagged (accessible): {file_path}")
+            else:
+                logger.info(f"ℹ️  PDF is not tagged: {file_path}")
+
+            return is_tagged
+
+        except Exception as e:
+            logger.warning(f"Could not determine if PDF is tagged: {e}")
+            # If we can't determine, assume it's not tagged to be safe
+            return False
+
     async def process_document(
         self,
         file_path: str,
@@ -88,6 +145,41 @@ class TextractProcessor:
                 logger.debug(f"Format not supported by Textract: {file_type}")
                 raise Exception(f"Format not supported by Textract: {file_type}. Supported: PDF, PNG, JPG, TIFF")
 
+            # Check if this is a PDF file
+            is_pdf = file_type == 'application/pdf' or file_path.lower().endswith('.pdf')
+
+            # If it's a PDF, check if it's tagged before processing
+            if is_pdf:
+                is_tagged = self._is_pdf_tagged(file_path)
+
+                if not is_tagged:
+                    logger.warning(f"PDF is not tagged - skipping pre-processing: {file_path}")
+                    return {
+                        "success": False,
+                        "processor": f"textract_{self.api_mode}",
+                        "fileName": os.path.basename(file_path),
+                        "content": "",
+                        "type": file_type,
+                        "metadata": {
+                            "pageCount": 0,
+                            "wordCount": 0,
+                            "characterCount": 0,
+                            "language": "en",
+                            "title": os.path.basename(file_path),
+                            "processor": f"textract_{self.api_mode}",
+                            "isTagged": False
+                        },
+                        "tables": [],
+                        "layout": {
+                            "hasMultipleColumns": False,
+                            "pageCount": 0,
+                            "sections": []
+                        },
+                        "chunks": [],
+                        "processedAt": datetime.now().isoformat(),
+                        "error": "PDF is not tagged - pre-processing is only supported for tagged PDFs"
+                    }
+
             # Read document bytes
             with open(file_path, 'rb') as doc_file:
                 doc_bytes = doc_file.read()
@@ -103,6 +195,10 @@ class TextractProcessor:
             tables = self._extract_tables_from_blocks(response.get('Blocks', [])) if self.api_mode == 'analyze' else []
             chunks = self._create_chunks_from_blocks(response.get('Blocks', []))
             metadata = self._extract_metadata(response, file_path, full_text)
+
+            # Add isTagged flag to metadata if it's a PDF
+            if is_pdf:
+                metadata['isTagged'] = True
 
             return {
                 "success": True,
